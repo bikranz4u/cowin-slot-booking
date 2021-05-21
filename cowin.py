@@ -15,22 +15,12 @@ import hashlib
 import argparse
 import time
 import sys
-from datetime import date, datetime
-from datetime import timedelta
+from datetime import date, datetime, timedelta
+from multiprocessing import Process
 from requests.sessions import session
 
 ######### Timer for OTP #########
 # define the countdown func.
-
-
-def countdown(t):
-    while t:
-        mins, secs = divmod(t, 60)
-        timer = '{:02d}:{:02d}'.format(mins, secs)
-        print(timer, end="\r")
-        time.sleep(1)
-        t -= 1
-
 
 ####################### List Of URLs #####################
 baseurl = "https://cdn-api.co-vin.in/api/v2/"
@@ -58,6 +48,7 @@ json_obj = {
 
 #secret: "U2FsdGVkX1+MToL2D7o4DiuqYBdQC+9/cXjXZB3pM9xwr2M4o5DLIU7fZMN//ZHLsyRip9lsS8nx6mWzi02G7A=="
 ###################################  Generate OTP  ####################################
+
 opt_headers = {'content-type': 'application/json',
                'accept': 'application/json', 'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Mobile Safari/537.36'}
 
@@ -68,12 +59,12 @@ otp_response = requests.post(
 txnID = otp_response.json()
 
 txnId = txnID['txnId']
-print("Your TransactionID:- ", txnId)
-print("")
+# print("Your TransactionID:- ", txnId)
+# print("")
 print("")
 print("OTP is sent to your mobile number .. Please enter that to proceed further !!!")
 print("")
-print("")
+
 
 otp_received = (
     input("Enter Your OTP , received on mobile , within 45 Secs:- "))
@@ -167,8 +158,15 @@ def getSlotsCalendarByPin():
                 print("Proceeding for Scheduling..................")
                 print("")
                 session_id = items['session_id']
-                return session_id
+                slot = items['slots']
+                if slot is None:
+                    print("")
+                    print("No Results Found for Slots ..It's None")
+                    # return session_id, slot[0]
+                else:
+                    return session_id, slot[0]
             else:
+                print("")
                 print("NO Slots available for 18 - 44 yrs Range...Try Later")
                 sys.exit()
 
@@ -195,19 +193,19 @@ def getSlotsCalendarByDistrict():
                 print("Proceeding for Scheduling..................")
                 print("")
                 session_id = items['session_id']
-                return session_id
+                slot = items['slots']
+                if slot is None:
+                    print("No Results Found for Slots ..It's None")
+                    print("")
+                    # return session_id, slot[0]
+                else:
+                    return session_id, slot[0]
             else:
+                print("")
                 print("NO Slots available for 18 - 44 yrs Range...Try Later")
                 sys.exit()
 
 
-# def getSlotScheduling():
-#     scheduling_headers = {'authorization': 'Bearer '+token,
-#                           'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Mobile Safari/537.36'}
-#     schedule_response = requests.post(
-#         baseurl+schedule, json.dumps(schedule_Payload), headers=scheduling_headers)
-#     schedule_response_json = schedule_response.json()
-#     print(schedule_response_json)
 # ############################################# Get Benificiaries #############################################
 # --header 'User-Agent: Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Mobile Safari/537.36'
 # --header 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36'
@@ -215,6 +213,7 @@ def getSlotsCalendarByDistrict():
 
 print("")
 print("----------------- Pulling Benificiaries Details ---------------")
+print("")
 benificiaries_headers = {'authorization': 'Bearer '+token,
                          'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Mobile Safari/537.36'}
 print(json.dumps(benificiaries_headers, indent=2))
@@ -240,17 +239,17 @@ for beneficiaries_details in benificiaries_response_json['beneficiaries']:
               beneficiaries_details['beneficiary_reference_id'])
         reference_id = beneficiaries_details['beneficiary_reference_id']
         beneficiaries_arr = reference_id.split()
-        print(type(beneficiaries_arr))  # Remove, for debugging only
-        print("Seaching for Slots :- ")
-        # session_id_resp = getSlotsCalendarByPin()  # Search using Pincode
-        session_id_resp = getSlotsCalendarByDistrict()  # Search Using District
+        # print(type(beneficiaries_arr))  # Remove, for debugging only
+        print("Seaching for Slots ..Finger Crossed: ")
+        session_id_resp, slot = getSlotsCalendarByPin()  # Search using Pincode
+        # session_id_resp,slot = getSlotsCalendarByDistrict()  # Search Using District
         schedule_Payload = {"dose": 1, 'session_id': session_id_resp,
-                            'beneficiaries': beneficiaries_arr, 'slot': 'FORENOON'}
+                            'beneficiaries': beneficiaries_arr, 'slot': slot}
         print(schedule_Payload)  # Remove, for debugging only
         scheduling_headers = {'authorization': 'Bearer '+token,
                               'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Mobile Safari/537.36'}
         schedule_response = requests.post(
-            baseurl+schedule, json.dumps(schedule_Payload), headers=scheduling_headers)
+            baseurl+schedule, data=json.loads(schedule_Payload), headers=scheduling_headers)
         schedule_response_json = schedule_response.json()
         print(schedule_response)
         # session_id_resp = getSlotsCalendarByDistrict()
@@ -271,10 +270,10 @@ for beneficiaries_details in benificiaries_response_json['beneficiaries']:
         today = date.today()
         if today > reminder_date:
             print("Seaching for Slots :- ")
-            # session_id_resp = getSlotsCalendarByPin()  # Check Using Local PINCODE
-            session_id_resp = getSlotsCalendarByDistrict()  # Search Using District
-            schedule_Payload = {"dose": 1, 'session_id': session_id_resp,
-                                'beneficiaries': reference_id, 'slot': 'FORENOON'}
+            session_id_resp, slot = getSlotsCalendarByPin()  # Check Using Local PINCODE
+            # session_id_resp,slot = getSlotsCalendarByDistrict()  # Search Using District
+            schedule_Payload = {"dose": 2, 'session_id': session_id_resp,
+                                'beneficiaries': reference_id, 'slot': slot}
             print(schedule_Payload)  # Remove, for debugging only
             scheduling_headers = {'authorization': 'Bearer '+token,
                                   'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Mobile Safari/537.36'}
